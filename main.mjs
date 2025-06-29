@@ -7,8 +7,9 @@ class ubigfloat {
 	denominator = 1n
 	gc() {
 		const gcd = (a, b) => a ? gcd(b % a, a) : b
-		this.numerator /= gcd(this.numerator, this.denominator)
-		this.denominator = this.denominator / gcd(this.numerator, this.denominator)
+		const common = gcd(this.numerator, this.denominator)
+		this.numerator /= common
+		this.denominator /= common
 		return this
 	}
 	static fromPair(numerator, denominator) {
@@ -19,11 +20,11 @@ class ubigfloat {
 	}
 	constructor(value) {
 		// 是否小数？
-		if (value instanceof ubigfloat) {
-			this.numerator = value.numerator
-			this.denominator = value.denominator
-		}
-		if (value instanceof Number && Math.floor(value) === value)
+		if (value instanceof ubigfloat)
+			return value
+		else if (Object(value) instanceof BigInt)
+			this.numerator = value
+		else if (Object(value) instanceof Number && Number.isInteger(value))
 			this.numerator = BigInt(value)
 		else if (value) {
 			const string = String(value)
@@ -55,35 +56,46 @@ class ubigfloat {
 		)
 	}
 	mod(other) {
+		if (this.isInf()) return other
+		if (!other.numerator) return new ubigfloat()
 		return ubigfloat.fromPair(
 			this.numerator * other.denominator % (this.denominator * other.numerator),
 			this.denominator * other.denominator
 		)
 	}
 	pow(other) {
+		if (other.isInf()) return other
+		const pow = other.floor()
 		return ubigfloat.fromPair(
-			this.numerator ** other.numerator,
-			this.denominator ** other.denominator
+			this.numerator ** pow,
+			this.denominator ** pow
 		)
 	}
+	isInf() {
+		return !this.denominator
+	}
 	equals(other) {
+		if (this.isInf() != other.isInf()) return false
 		return this.numerator * other.denominator === other.numerator * this.denominator
 	}
 	lessThan(other) {
+		if (this.isInf() != other.isInf()) return other.isInf()
 		return this.numerator * other.denominator < other.numerator * this.denominator
 	}
 	greaterThan(other) {
+		if (this.isInf() != other.isInf()) return this.isInf()
 		return this.numerator * other.denominator > other.numerator * this.denominator
 	}
 	compare(other) {
 		return this.greaterThan(other) ? 1 : this.lessThan(other) ? -1 : 0
 	}
 	floor() {
+		if (this.isInf()) return this
 		return this.numerator / this.denominator
 	}
 	toString() {
-		if (this.denominator == 1) return this.numerator.toString()
-		else if (this.denominator == 0) return '∞'
+		if (this.denominator === 1n) return this.numerator.toString()
+		if (this.denominator === 0n) return '∞'
 		const integer = this.numerator / this.denominator
 		let decimal = this.numerator - integer * this.denominator
 		let result = integer.toString()
@@ -108,6 +120,7 @@ class ubigfloat {
 		return result
 	}
 	static fromString(string) {
+		if (string === '∞') return ubigfloat.fromPair(1n, 0n)
 		// handle [ and ]
 		if (string.includes('[')) {
 			const loop_part = string.slice(string.indexOf('[') + 1, string.indexOf(']'))
@@ -140,10 +153,8 @@ class bigfloat {
 	sign = false
 
 	constructor(value) {
-		if (value instanceof bigfloat) {
-			this.basenum = value.basenum
-			this.sign = value.sign
-		}
+		if (value instanceof bigfloat)
+			return value
 		else if (value) {
 			let string = String(value)
 			if (string.startsWith('-')) {
@@ -155,7 +166,6 @@ class bigfloat {
 	}
 
 	toString() {
-		if (this.basenum.denominator == 0) return '∞'
 		return (this.sign ? '-' : '') + this.basenum.toString()
 	}
 	static fromString(string) {
@@ -204,30 +214,46 @@ class bigfloat {
 		other = new bigfloat(other)
 		return bigfloat.fromNumAndSign(this.sign, this.basenum.pow(other.basenum))
 	}
+	isInf() {
+		return this.basenum.isInf()
+	}
 	equals(other) {
 		other = new bigfloat(other)
 		if (this.basenum.equals(other.basenum))
-			if (this.basenum.numerator == 0) return true
+			if (!this.basenum.numerator) return true
 			else return this.sign === other.sign
 		return false
 	}
 	lessThan(other) {
 		other = new bigfloat(other)
-		return this.sign === other.sign ? this.basenum.lessThan(other.basenum) : this.sign
+		if (this.sign !== other.sign)
+			return this.sign
+		else if (this.sign) // 都是负数
+			return this.basenum.greaterThan(other.basenum) // 负数绝对值大的反而小
+		else
+			return this.basenum.lessThan(other.basenum)
 	}
 	greaterThan(other) {
 		other = new bigfloat(other)
-		return this.sign === other.sign ? this.basenum.greaterThan(other.basenum) : !this.sign
+		if (this.sign !== other.sign)
+			return !this.sign
+		else if (this.sign)
+			return this.basenum.lessThan(other.basenum) // 负数绝对值小的反而大
+		else
+			return this.basenum.greaterThan(other.basenum)
 	}
 	compare(other) {
 		other = new bigfloat(other)
-		return this.sign === other.sign ? this.basenum.compare(other.basenum) : [1, -1][this.sign]
+		if (this.sign !== other.sign)
+			return this.sign ? -1 : 1
+		else
+			return this.basenum.compare(other.basenum)
 	}
 	floor() {
 		return bigfloat.fromNumAndSign(this.sign, new ubigfloat(this.basenum.floor()))
 	}
 	toBoolean() {
-		return this.basenum.greaterThan(0n)
+		return Boolean(this.basenum.numerator)
 	}
 	static eval(string) {
 		// 去除所有空格
@@ -236,7 +262,6 @@ class bigfloat {
 		// 校验表达式合法性
 		if (!/^[\d!%&()*+./<=>|\-]+$/.test(string))
 			throw new Error(`Invalid characters in expression: ${string}`)
-
 
 		// 定义运算符优先级和关联性
 		const precedence = {
@@ -274,11 +299,6 @@ class bigfloat {
 					if (token === '-' && (i === 0 || tokens[i - 1] in precedence || tokens[i - 1] === '('))
 						operatorStack.push('~') // 用 "~" 表示一元负号
 					else {
-						// 处理运算符
-						// 检查连续的运算符
-						if (i > 0 && tokens[i - 1] in precedence && tokens[i - 1] !== '~')
-							console.warn('  WARNING: Consecutive operators detected:', tokens[i - 1], token)
-
 						while (
 							operatorStack.length > 0 && // 确保 operatorStack 不为空
 							operatorStack[operatorStack.length - 1] !== '(' &&
@@ -390,7 +410,6 @@ class bigfloat {
 			if (stack.length !== 1)
 				throw new Error(`Invalid expression: ${string}`)
 
-
 			return stack[0]
 		}
 
@@ -416,7 +435,11 @@ class bigfloat {
 	}
 }
 /**
- * @type {bigfloat & ((value: string | number) => bigfloat)}
+ * @type {bigfloat & {
+ *   (value: string | number | undefined) => bigfloat
+ *   eval(value: string | number | undefined): bigfloat
+ *   evalFromStrings(string: string): Record<string, bigfloat>
+ * }}
  */
 const bigfloatProxy = new Proxy(bigfloat, {
 	apply(target, thisArg, args) {

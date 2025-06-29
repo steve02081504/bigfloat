@@ -1,6 +1,6 @@
 {
   "name": "@steve02081504/bigfloat",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A simple JavaScript implementation of infinite precision arithmetic.",
   "main": "main.mjs",
   "type": "module",
