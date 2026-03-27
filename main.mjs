@@ -212,7 +212,15 @@ class bigfloat {
 	}
 	pow(other) {
 		other = new bigfloat(other)
-		return bigfloat.fromNumAndSign(this.sign, this.basenum.pow(other.basenum))
+		const exp_floor = other.basenum.floor()  // 指数绝对值取整（BigInt）
+		const powered = this.basenum.pow(other.basenum)
+		// 负指数：取倒数
+		const result_basenum = other.sign
+			? ubigfloat.fromPair(powered.denominator, powered.numerator)
+			: powered
+		// 负底数：奇次幂为负，偶次幂为正
+		const result_sign = this.sign && (exp_floor % 2n !== 0n)
+		return bigfloat.fromNumAndSign(result_sign, result_basenum)
 	}
 	isInf() {
 		return this.basenum.isInf()
